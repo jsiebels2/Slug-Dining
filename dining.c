@@ -9,6 +9,7 @@ typedef struct dining {
   int currentStudentCount;
   int capacity;
   bool cleaning;
+  bool cleanerWaiting;
   pthread_mutex_t lock;
   pthread_cond_t capacityCond;
   pthread_cond_t cleaningCond;
@@ -20,6 +21,7 @@ dining_t *dining_init(int capacity) {
   dining->capacity = capacity;
   dining->currentStudentCount = 0;
   dining->cleaning = false;
+  dining->cleanerWaiting = false;
   pthread_mutex_init(&dining->lock, NULL);
   pthread_cond_init(&dining->capacityCond, NULL);
   pthread_cond_init(&dining->cleaningCond, NULL);
@@ -38,7 +40,8 @@ void dining_destroy(dining_t **dining) {
 void dining_student_enter(dining_t *dining) {
   pthread_mutex_lock(&dining->lock);
 
-  while (dining->currentStudentCount == dining->capacity || dining->cleaning) {
+  while (dining->currentStudentCount == dining->capacity || dining->cleaning ||
+         dining->cleanerWaiting) {
     pthread_cond_wait(&dining->capacityCond, &dining->lock);
   }
 
@@ -64,10 +67,12 @@ void dining_cleaning_enter(dining_t *dining) {
   pthread_mutex_lock(&dining->lock);
 
   while (dining->currentStudentCount != 0 || dining->cleaning) {
+    dining->cleanerWaiting = true;
     pthread_cond_wait(&dining->cleaningCond, &dining->lock);
   }
 
   dining->cleaning = true;
+  dining->cleanerWaiting = false;
 
   pthread_mutex_unlock(&dining->lock);
 }
